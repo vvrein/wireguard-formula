@@ -1,0 +1,31 @@
+[NetDev]
+Name                = {{ ifname }}
+Kind                = wireguard
+
+[WireGuard]
+{%- if "listen" in config %}
+ListenPort          = {{ config["listen"] }}
+{%- endif %}
+PrivateKey          = {{ config["privatekey"] }}
+#PublicKey          = {{ config["publickey"] }}
+
+{% for peer in config.get("peer",[]) %}
+[WireGuardPeer]
+  {%- if "comment" in peer %}
+#Comment            = {{ peer["comment"] }}
+  {%- endif %}
+PublicKey           = {{ peer["publickey"] }}
+AllowedIPs          = {{ peer["allowedips"] }}
+  {%- if "endpoint" in peer %}
+Endpoint            = {{ peer["endpoint"] }}
+  {%- endif %}
+
+  {%- if "keepalive" in peer %}
+PersistentKeepalive = {{ peer["keepalive"] }}
+  {%- endif %}
+
+  {%- if "rttable" in peer %}
+RouteTable          = {{ peer["rttable"] }}
+  {%- endif %}
+
+{% endfor %}

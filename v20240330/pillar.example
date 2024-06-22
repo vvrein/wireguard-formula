@@ -1,0 +1,131 @@
+{% load_yaml as wireguard %}
+wireguard:
+  version: v20240330
+
+  defaults:
+    keepalive: 30
+    rttable: "off"
+
+  pub1.host:
+    wgt0:
+      type: wg-quick
+      listen: 12020
+      endpoint: 1.2.3.4
+      privatekey: BI7lZWslw2qEMTAEzmx54R1zCO0j7iro31uxSgfGjPj=
+      publickey: 9Dayb9V5XsWLcgn7cVJkeVu1QjZqcluTuk0ynyGvVNk=
+      address: 192.168.69.1/24
+      config:
+        Table: main
+        PostUp: iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS  --clamp-mss-to-pmtu; iptables -t nat -A POSTROUTING -o venet0 -j SNAT --to 10.37.10.120
+        PostDown: iptables -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS  --clamp-mss-to-pmtu; iptables -t nat -D POSTROUTING -o venet0 -j SNAT --to 10.37.10.120
+      peer:
+        - interconnect: pub2.host:wgt0
+        - interconnect: srv3.host:wgt0
+          allowedips: 192.168.69.3/32, 192.168.90.0/24
+
+  pub2.host:
+    wgt0:
+      privatekey: APXsEwo73z2NOQAktYVtwGDL8bujgbXg5iVR4V7NlGr=
+      publickey: 1IapprEOp3QEyo2WjWzD2ruNtpIH8mI63AC1MSXp0ky=
+      address: 192.168.69.2/24
+      systemd.network:
+        RoutingPolicyRule:
+          - Table: 1000
+      peer:
+        - interconnect: pub1.host
+          allowedips: 0.0.0.0/0
+
+    wg0server:
+      defaults:
+        keepalive: 60
+
+      listen: 51820
+      endpoint: pub2.host
+      privatekey: QW4ahpvLvYZJjN8Sz7mdqAamVmKuX899uXam2q17Hju=
+      publickey: BlCsqg8dCAPjkxejLA5XGtNstrYA69F2tVhMWsoBLPT=
+      address: 192.168.68.1/24
+      systemd.network:
+        Route: 
+          - Destination: 192.168.90.0/24
+            Gateway: 192.168.68.103
+          - Destination: 192.168.100.0/24
+      peer:
+        - interconnect: srv1.host
+        - interconnect: srv2.host
+        - interconnect: srv3.host
+          allowedips: 192.168.90.0/24, 192.168.68.103/32
+
+        - comment: peer1.host
+          publickey: 9AG8scPX2lFwxjj7CQfSXBHydUxLs9cjXZyc9qE7kIM=
+          allowedips: 192.168.68.102/32
+
+        - comment: peer2.host
+          publickey: llYWJic1ZupaG4PSW995Pnkm6RUc6SizdOTK9y5E2Pz=
+          allowedips: 192.168.68.30/32
+
+        - comment: peer3.host
+          publickey: hAOKUvleZ1QrOd6dKiQApeTF7A7ScTOPc9Cq3JGzNSx=
+          allowedips: 192.168.68.32/32
+
+  srv1.host:
+    wg0:
+      privatekey:
+      publickey: pEQTnR72wnY1Xt8rT5PR63w4wZw6X4wiWtRj5v97XFm=
+      address: 192.168.68.31/24
+      peer:
+        - interconnect: pub2.host:wg0server
+          allowedips: 0.0.0.0/0
+        - interconnect: srv2.host
+
+  srv2.host:
+    wg0:
+      listen: 51820
+      endpoint: srv2.host
+      privatekey: 
+      publickey: CXKw0z6CPDLFR28VwW3HrMQem8Q1swo0EXSozFZu5aq=
+      address: 192.168.68.33/24
+      systemd.network:
+        Route:
+          - Table: 10
+            Gateway: 192.168.68.1
+            Destination: 0.0.0.0/0
+          - Destination: 192.168.90.0/24
+      peer:
+        - interconnect: pub2.host:wg0server
+          allowedips: 0.0.0.0/0
+        - interconnect: srv1.host
+
+
+  srv3.host:
+    wg0:
+      privatekey: 
+      publickey: xaTuEGXkACkQN5nNOz9R538bDZNwQFYAepSjvjTjC5V=
+      address: 192.168.68.103/24
+      peer:
+        - interconnect: pub2.host:wg0server
+          allowedips: 0.0.0.0/0
+    wgt0:
+      privatekey: CMyjIVmBJ34KtkjNXCqIT5PM4JSyTUejnFxwRkZ4f3m=
+      publickey: K4V5ittQS2GniCLCcED31cXLe25qUlnY3Vl4q07oARr=
+      address: 192.168.69.3/24
+      systemd.network:
+        RoutingPolicyRule: 
+          - Table: 1000
+            FirewallMark: 800
+      peer:
+        - interconnect: pub1.host
+          allowedips: 0.0.0.0/0
+
+{% endload %}
+
+{# this behavior of loading and wrapping yaml is neede to strip out all privatekeys that is not desired for particular host #}
+
+{% for name, configs in wireguard["wireguard"].items() %}
+  {% if name != grains["id"] and name not in ["version", "defaults"] %}
+    {% for ifname, ifconfig in configs.items() %}
+      {% do ifconfig.update({"privatekey":""}) %}
+    {% endfor %}
+  {% endif %} 
+{% endfor %}
+
+{{ wireguard }}

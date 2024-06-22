@@ -1,0 +1,15 @@
+[Match]
+Name = {{ ifname }}
+
+{%- if config.get("address", False) %}
+  {%- do config.setdefault("systemd.network",{}).setdefault("Network",[]).append({"Address": config["address"]}) %}
+{%- endif %}
+
+{%- for name, chapter in config.get("systemd.network", {}) | dictsort %}
+  {%- for contents in chapter %}
+[{{ name }}]
+    {%- for key, value in contents.items() %}
+{{ key }} = {{ value }}
+    {%- endfor %}
+  {%- endfor %}
+{%- endfor %}
