@@ -22,7 +22,11 @@ wireguard-tools:
       {%- else %}
          {%- set int_peer_ifname = int_peer_info[1] %}
       {%- endif %}
-      {%- set int_peer_ifconf = wireguard.get(int_peer_name,{}).get(int_peer_ifname,{}) %}
+      {%- set int_peer_ifconf = wireguard.get(int_peer_name,{}).get(int_peer_ifname, none) %}
+      {%- if not int_peer_ifconf %}
+          {{ raise("Error in interconnection settings! Seems interconnect peer '"~ int_peer_name ~"' has no '"~ int_peer_ifname ~"' interface.") }}
+      {%- endif %}
+
 
       {%- do p.setdefault("comment", int_peer_name) %}
       {%- do p.setdefault("publickey", int_peer_ifconf["publickey"]) %}
